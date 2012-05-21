@@ -1,0 +1,40 @@
+<% 
+  f = taglib("/lib/form")
+  f.block do
+    f.entry(:title => 'Node Name', 
+            :field => 'node_name', 
+            :description => "Name of the node to install") do
+            f.textbox    
+    end 
+    f.entry(:title => 'SSH Connection String',
+            :field => 'conn_string',
+            :description => 'Connection string in the form user@server[:port].') do
+            f.textbox    
+    end 
+    f.entry(:title => 'SSH Key', 
+            :field => 'ssh_key', 
+            :description => 'Full path to keyfile for SSH.') do
+            f.textbox    
+    end 
+    f.entry(:title => 'SSH Passphrase or Password', 
+            :field => 'ssh_pass', 
+            :description => 'Passphrase to decrypt ketfile, or SSH password.') do
+            f.password    
+    end
+    f.entry(:title => 'Staging Directory', 
+            :field => 'stage_dir', 
+            :description => "Directory to stage the installer.  A node directory will be created.") do
+            f.textbox    
+    end
+    f.entry(:title => 'Environment', 
+            :field => 'ssh_env', 
+            :description => 'Environment variables to set before executing commands. Format: VAR=VALUE') do
+            f.textarea    
+    end 
+    f.entry(:title => 'Command(s)', 
+            :field => 'ssh_cmds', 
+            :description => 'What to execute via SSH') do
+            f.textarea 
+    end 
+  end
+%>

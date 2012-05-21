@@ -1,0 +1,7 @@
+pkg
+work
+*.war
+*.swp
+*.swn
+.rvmrc
+Gemfile.lock
