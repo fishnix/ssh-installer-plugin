@@ -1,6 +1,6 @@
 Jenkins::Plugin::Specification.new do |plugin|
   plugin.name = "ssh-installer"
-  plugin.display_name = "Ssh Installer Plugin"
+  plugin.display_name = "Full Featured SSH Installer Plugin"
   plugin.version = '0.0.1'
   plugin.description = 'TODO: enter description here'
 
@@ -10,7 +10,7 @@ Jenkins::Plugin::Specification.new do |plugin|
   plugin.url = 'https://wiki.jenkins-ci.org/display/JENKINS/Ssh+Installer+Plugin'
 
   # The first argument is your user name for jenkins-ci.org.
-  plugin.developed_by "fish", "E Camden Fisher <fish@fishnix.net>"
+  plugin.developed_by "fishnix", "E Camden Fisher <fish@fishnix.net>"
 
   # This specifies where your code is hosted.
   # Alternatives include:

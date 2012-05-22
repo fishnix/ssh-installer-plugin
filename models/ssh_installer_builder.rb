@@ -46,9 +46,14 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   def prebuild(build, listener)
     listener.info("Node Name: \"#{@node_name}\".")
     listener.info("Remote Host: \"#{@host}\"\nRemote Port: \"#{@port}\"\nRemote User: \"#{@user}\"")
-    listener.info("Staging Dir: \"#{@stage_dir}\"")
-    result = prepare_staging_dir
+
+    staging_dir = @stage_dir + '/' + @node_name
+    listener.info("Staging Dir: \"#{staging_dir}\"")
+    
+    result = prepare_staging_dir(staging_dir)
     listener.info("#{result}")
+    
+    transfer_workspace(build.workspace.to_s, staging_dir)
   end
 
   ##
@@ -64,35 +69,6 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   end
 
   private
-  
-  def run_ssh_cmd
-    result = "" 
-    Net::SSH.start(@host, @user, connection_options) do |ssh|
-      ssh.exec @ssh_cmds do |ch,stream,data|
-        if stream == :stderr
-          raise "FUCK! #{data}"
-        else
-          result << data
-        end
-      end
-    end
-    result
-  end
-  
-  def prepare_staging_dir
-    
-    conn_opts = connection_options
-     
-    node_path = @stage_dir + '/' + @node_name    
-    Net::SFTP.start(@host, @user, conn_opts) do |sftp|
-      request = sftp.stat(@node_path) do |response|
-        unless response.ok?
-          sftp.mkdir(node_path, :permissions => 0700).wait
-        end
-      end
-      request.wait
-    end
-  end
   
   def parse_conn_string(cstring)
     if cstring
@@ -114,6 +90,63 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
     end
     
     connection_options
+  end
+  
+  def prepare_staging_dir(staging_dir)
+    Net::SFTP.start(@host, @user, connection_options) do |sftp|
+      request = sftp.stat(staging_dir) do |response|
+        return unless response.ok?
+      end
+      request.wait
+      
+      rm_rf(sftp, staging_dir)
+    end
+  end
+  
+  def transfer_workspace(workspace, staging_dir)
+    Net::SFTP.start(@host, @user, connection_options) do |sftp|      
+      sftp.upload!(workspace, staging_dir)
+    end
+  end
+  
+  def run_ssh_cmd
+    result = ""
+    Net::SSH.start(@host, @user, connection_options) do |ssh|
+      ssh.exec @ssh_cmds do |ch,stream,data|
+        if stream == :stderr
+          raise "FUCK! #{data}"
+        else
+          result << data
+        end
+      end
+    end
+    result
+  end
+  
+  def rm_rf(sftp, dir)
+    sftp.opendir(dir) do |response|
+       raise "failed to open directory: " + dir unless response.ok?
+
+       loop do
+         request = sftp.readdir(response[:handle]).wait
+         break if request.response.eof?
+         raise "failed to read directory: " + dir unless request.response.ok?
+
+         request.response[:names].each do |entry|
+           next if entry.name == '.' or entry.name == '..'
+
+           if entry.file? or entry.symlink?
+             sftp.remove!(dir + '/' + entry.name)
+           elsif entry.directory?
+             rm_rf(sftp, dir + '/' + entry.name)
+           else
+              raise "Couldn't determine type for " + entry.name
+           end
+         end
+       end
+       sftp.rmdir!(dir)
+       sftp.close(response[:handle])
+     end
   end
 
 end
