@@ -1,3 +1,8 @@
+<%
+=begin
+  These taglib docs are kind of useful: <http://jenkins-ci.org/maven-site/hudson-core/jelly-taglib-ref.html>
+=end
+%>
 <% 
   f = taglib("/lib/form")
   f.block do
@@ -36,5 +41,12 @@
             :description => 'What to execute via SSH') do
             f.textarea 
     end 
+  end
+  f.advanced do
+    f.entry(:title => 'Forward SSH Agent?',
+            :field => 'forward_agent',
+            :description => 'Check this box to forward the ssh agent.') do
+            f.checkbox
+    end
   end
 %>

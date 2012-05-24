@@ -16,6 +16,7 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   attr_accessor :ssh_env
   attr_accessor :ssh_cmds
   attr_accessor :stage_dir
+  attr_accessor :forward_agent
   
   
   # Invoked with the form parameters when this extension point
@@ -23,6 +24,7 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   def initialize(attrs = {})
     @node_name = attrs['node_name']
     @conn_string = attrs['conn_string']
+    @forward_agent = attrs['forward_agent']
     
     conn_attr = parse_conn_string attrs['conn_string']
     @host = conn_attr[:host]
@@ -46,9 +48,11 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   def prebuild(build, listener)
     listener.info("Node Name: \"#{@node_name}\".")
     listener.info("Remote Host: \"#{@host}\"\nRemote Port: \"#{@port}\"\nRemote User: \"#{@user}\"")
+    listener.info("Forward Agent: \"#{@forward_agent}\"")
 
     staging_dir = @stage_dir + '/' + @node_name
     listener.info("Staging Dir: \"#{staging_dir}\"")
+    listener.info("ENV: #{setenv}")
     
     result = prepare_staging_dir(staging_dir)
     listener.info("#{result}")
@@ -63,6 +67,10 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   # @param [Jenkins::Launcher] launcher the launcher that can run code on the node running this build
   # @param [Jenkins::Model::Listener] listener the listener for this build.
   def perform(build, launcher, listener)
+    #listener.info("#{build.class.instance_methods}")
+    build_params = filter_for_node_name(build.native.getBuildVariables())
+    listener.info("#{build_params}")
+    
     listener.info("Attempting to connect to \"#{@host}\" on port \"#{@port}\" as \"#{@user}\".")
     result = run_ssh_cmd
     listener.info("#{result}")
@@ -80,7 +88,10 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   end
   
   def connection_options
-    connection_options = { :port => @port, :verbose => Logger::INFO }
+    connection_options = {  :port => @port, 
+                            :forward_agent => @forward_agent, 
+                            :verbose => Logger::INFO 
+                          }
           
     if @ssh_key.nil?
       connection_options[:password] = @ssh_pass
@@ -90,6 +101,19 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
     end
     
     connection_options
+  end
+  
+  def filter_for_node_name(build_params)
+    build_params.each do |k,v|
+      build_params[k] = v.gsub!('${node_name}', @node_name)
+    end
+  end
+  
+  def filter_for_build_params(build_params)
+    build_params.each_key do |k,v|
+      var = '${' + k + '}'
+      @ssh_cmds.gsub!(var,v) unless @ssh_cmds.nil?
+    end
   end
   
   def prepare_staging_dir(staging_dir)
@@ -112,7 +136,7 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   def run_ssh_cmd
     result = ""
     Net::SSH.start(@host, @user, connection_options) do |ssh|
-      ssh.exec @ssh_cmds do |ch,stream,data|
+      ssh.exec(setenv + ';' + @ssh_cmds) do |ch,stream,data|
         if stream == :stderr
           raise "FUCK! #{data}"
         else
@@ -121,6 +145,10 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
       end
     end
     result
+  end
+  
+  def setenv
+    @ssh_env.split.join(';')
   end
   
   def rm_rf(sftp, dir)
