@@ -16,6 +16,7 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   attr_accessor :ssh_env
   attr_accessor :ssh_cmds
   attr_accessor :stage_dir
+  attr_accessor :xfer_workspace
   attr_accessor :forward_agent
   
   
@@ -25,6 +26,7 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
     @node_name = attrs['node_name']
     @conn_string = attrs['conn_string']
     @forward_agent = attrs['forward_agent']
+    @xfer_workspace = attrs['xfer_workspace']
     
     conn_attr = parse_conn_string attrs['conn_string']
     @host = conn_attr[:host]
@@ -49,15 +51,23 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
     listener.info("Node Name: \"#{@node_name}\".")
     listener.info("Remote Host: \"#{@host}\"\nRemote Port: \"#{@port}\"\nRemote User: \"#{@user}\"")
     listener.info("Forward Agent: \"#{@forward_agent}\"")
+    listener.info("Transfer Workspace: \"#{@xfer_workspace}\"")
 
     staging_dir = @stage_dir + '/' + @node_name
     listener.info("Staging Dir: \"#{staging_dir}\"")
     listener.info("ENV: #{setenv}")
     
+    listener.info("About to prepare staging directory.")
     result = prepare_staging_dir(staging_dir)
     listener.info("#{result}")
     
-    transfer_workspace(build.workspace.to_s, staging_dir)
+    if @xfer_workspace 
+      listener.info("Starting to transfer workspace.")
+      transfer_workspace(build.workspace.to_s, staging_dir)
+    else
+      listener.info("Not transfering workspace, disabled by plugin.")
+    end
+    
   end
 
   ##
@@ -69,11 +79,11 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   def perform(build, launcher, listener)
     #listener.info("#{build.class.instance_methods}")
     build_params = filter_for_node_name(build.native.getBuildVariables())
-    listener.info("#{build_params}")
+    listener.info("Build Params: #{build_params}")
     
     listener.info("Attempting to connect to \"#{@host}\" on port \"#{@port}\" as \"#{@user}\".")
     result = run_ssh_cmd
-    listener.info("#{result}")
+    listener.info("SSH CMD Result: #{result}")
   end
 
   private
@@ -116,23 +126,62 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
     end
   end
   
+  # Prepare the staging directory on the target
+  #   1. Check if dir exists, if it does, blast it
+  #   2. Create staging directory
+  #   3. Check that dir exists
   def prepare_staging_dir(staging_dir)
     Net::SFTP.start(@host, @user, connection_options) do |sftp|
-      request = sftp.stat(staging_dir) do |response|
-        return unless response.ok?
-      end
-      request.wait
+      puts "Preparing staging dir: " + staging_dir
       
-      rm_rf(sftp, staging_dir)
+      begin
+        staging_dir_attrs = sftp.stat!(staging_dir)
+        rm_rf(sftp, staging_dir)
+        
+        puts "Creating staging dir."
+        # (re)create the staging directory
+        response = sftp.mkdir! "#{staging_dir}"
+        raise "Failed to create staging directory " + staging_dir unless response.ok?
+        
+      rescue
+        puts "Creating staging dir."
+
+        # (re)create the staging directory
+        response = sftp.mkdir! "#{staging_dir}"
+        raise "Failed to create staging directory " + staging_dir unless response.ok?
+      end
+      
+      # make sure the directory exists now
+      response = sftp.stat! "#{staging_dir}"
+      raise "Staging directory: " + staging_dir + " doesnt exist." unless response.directory?
+      
+      # delete staging directory recursively if it exists
+      # staging_dir_attrs = sftp.stat!(staging_dir)
+      # request = sftp.stat!(staging_dir) do |response|
+      #   if response.ok?
+      #     puts "Staging dir: #{staging_dir} appears to exist, removing it."
+      #     rm_rf(sftp, staging_dir)
+      #   end
+      # end
+      
+      # (re)create the staging directory
+      # response = sftp.mkdir! "#{staging_dir}"
+      # raise "Failed to create staging directory " + staging_dir unless response.ok?
+      
+      # make sure the directory exists now
+      # response = sftp.stat! "#{staging_dir}"
+      # raise "Staging directory: " + staging_dir + " doesnt exist." unless response.directory?
     end
   end
   
+  # recursively transfer workspace to the staging dir
   def transfer_workspace(workspace, staging_dir)
     Net::SFTP.start(@host, @user, connection_options) do |sftp|      
       sftp.upload!(workspace, staging_dir)
     end
   end
   
+  # run a remote SSH command
   def run_ssh_cmd
     result = ""
     Net::SSH.start(@host, @user, connection_options) do |ssh|
@@ -147,10 +196,13 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
     result
   end
   
+  # join the array of env vars with semicolon
   def setenv
     @ssh_env.split.join(';')
   end
   
+  # recursively delete a directory,
+  # takes sftp session object + directory name
   def rm_rf(sftp, dir)
     sftp.opendir(dir) do |response|
        raise "failed to open directory: " + dir unless response.ok?

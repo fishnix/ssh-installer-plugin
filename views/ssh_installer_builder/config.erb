@@ -10,7 +10,7 @@
             :field => 'node_name', 
             :description => "Name of the node to install") do
             f.textbox    
-    end 
+    end
     f.entry(:title => 'SSH Connection String',
             :field => 'conn_string',
             :description => 'Connection string in the form user@server[:port].') do
@@ -23,7 +23,7 @@
     end 
     f.entry(:title => 'SSH Passphrase or Password', 
             :field => 'ssh_pass', 
-            :description => 'Passphrase to decrypt ketfile, or SSH password.') do
+            :description => 'Passphrase to decrypt keyfile, or SSH password.') do
             f.password    
     end
     f.entry(:title => 'Staging Directory', 
@@ -40,6 +40,11 @@
             :field => 'ssh_cmds', 
             :description => 'What to execute via SSH') do
             f.textarea 
+    end
+    f.entry(:title => 'Transfer Workspace to target?',
+            :field => 'xfer_workspace',
+            :description => 'Check this box to recursively transfer your workspace to the target server.') do
+            f.checkbox
     end 
   end
   f.advanced do
