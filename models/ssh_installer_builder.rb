@@ -145,44 +145,6 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
       
       raise "Staging directory: " + staging_dir + " doesnt exist but should." unless exists?(sftp,staging_dir)
       
-      
-      # begin
-      #   staging_dir_attrs = sftp.stat!(staging_dir)
-      #   rm_rf(sftp, staging_dir)
-      #   
-      #   puts "Creating staging dir."
-      #   # (re)create the staging directory
-      #   response = sftp.mkdir! "#{staging_dir}"
-      #   raise "Failed to create staging directory " + staging_dir unless response.ok?
-      #   
-      # rescue
-      #   puts "Creating staging dir."
-      # 
-      #   # (re)create the staging directory
-      #   response = sftp.mkdir! "#{staging_dir}"
-      #   raise "Failed to create staging directory " + staging_dir unless response.ok?
-      # end
-      
-      # make sure the directory exists now
-      # response = sftp.stat! "#{staging_dir}"
-      # raise "Staging directory: " + staging_dir + " doesnt exist." unless response.directory?
-      
-      # delete staging directory recursively if it exists
-      # staging_dir_attrs = sftp.stat!(staging_dir)
-      # request = sftp.stat!(staging_dir) do |response|
-      #   if response.ok?
-      #     puts "Staging dir: #{staging_dir} appears to exist, removing it."
-      #     rm_rf(sftp, staging_dir)
-      #   end
-      # end
-      
-      # (re)create the staging directory
-      # response = sftp.mkdir! "#{staging_dir}"
-      # raise "Failed to create staging directory " + staging_dir unless response.ok?
-      
-      # make sure the directory exists now
-      # response = sftp.stat! "#{staging_dir}"
-      # raise "Staging directory: " + staging_dir + " doesnt exist." unless response.directory?
     end
   end
   
