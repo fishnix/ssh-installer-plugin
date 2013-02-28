@@ -57,9 +57,8 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
     listener.info("Staging Dir: \"#{staging_dir}\"")
     listener.info("ENV: #{setenv}")
     
-    listener.info("About to prepare staging directory.")
+    listener.info("Preparing staging directory.")
     result = prepare_staging_dir(staging_dir)
-    listener.info("#{result}")
     
     if @xfer_workspace 
       listener.info("Starting to transfer workspace.")
@@ -134,26 +133,39 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
     Net::SFTP.start(@host, @user, connection_options) do |sftp|
       puts "Preparing staging dir: " + staging_dir
       
-      begin
-        staging_dir_attrs = sftp.stat!(staging_dir)
+      if exists?(sftp,staging_dir)
+        puts "exists."
         rm_rf(sftp, staging_dir)
-        
-        puts "Creating staging dir."
-        # (re)create the staging directory
-        response = sftp.mkdir! "#{staging_dir}"
-        raise "Failed to create staging directory " + staging_dir unless response.ok?
-        
-      rescue
-        puts "Creating staging dir."
-
-        # (re)create the staging directory
-        response = sftp.mkdir! "#{staging_dir}"
-        raise "Failed to create staging directory " + staging_dir unless response.ok?
+      else
+        puts "doesnt"
       end
       
+      response = sftp.mkdir! "#{staging_dir}"
+      raise "Failed to create staging directory " + staging_dir unless response.ok?
+      
+      raise "Staging directory: " + staging_dir + " doesnt exist but should." unless exists?(sftp,staging_dir)
+      
+      
+      # begin
+      #   staging_dir_attrs = sftp.stat!(staging_dir)
+      #   rm_rf(sftp, staging_dir)
+      #   
+      #   puts "Creating staging dir."
+      #   # (re)create the staging directory
+      #   response = sftp.mkdir! "#{staging_dir}"
+      #   raise "Failed to create staging directory " + staging_dir unless response.ok?
+      #   
+      # rescue
+      #   puts "Creating staging dir."
+      # 
+      #   # (re)create the staging directory
+      #   response = sftp.mkdir! "#{staging_dir}"
+      #   raise "Failed to create staging directory " + staging_dir unless response.ok?
+      # end
+      
       # make sure the directory exists now
-      response = sftp.stat! "#{staging_dir}"
-      raise "Staging directory: " + staging_dir + " doesnt exist." unless response.directory?
+      # response = sftp.stat! "#{staging_dir}"
+      # raise "Staging directory: " + staging_dir + " doesnt exist." unless response.directory?
       
       # delete staging directory recursively if it exists
       # staging_dir_attrs = sftp.stat!(staging_dir)
@@ -199,6 +211,17 @@ class Ssh_installerBuilder < Jenkins::Tasks::Builder
   # join the array of env vars with semicolon
   def setenv
     @ssh_env.split.join(';')
+  end
+  
+  # returns the stat object if exists, false if not
+  # takes sftp session object + file/dir name
+  def exists?(sftp,dir)
+    begin
+      sftp.stat!(dir)
+    rescue Net::SFTP::StatusException => e 
+      raise unless e.code == 2
+      false
+    end
   end
   
   # recursively delete a directory,
