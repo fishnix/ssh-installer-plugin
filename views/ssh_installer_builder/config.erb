@@ -53,5 +53,10 @@
             :description => 'Check this box to forward the ssh agent.') do
             f.checkbox
     end
+    f.entry(:title => 'Install properties file', 
+            :field => 'install_properties', 
+            :description => "File to hold the install properties (defaults to install.properties).") do
+            f.textbox    
+    end
   end
 %>
